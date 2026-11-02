@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Bura (31) - 4 Kartalik & Multiplayer</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --felt-pattern: radial-gradient(circle at 50% 45%, #166534 0%, #052e16 100%);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--felt-pattern);
+      color: #f8fafc;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .font-cinzel {
+      font-family: 'Cinzel', serif;
+    }
+
+    .card-item {
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.5);
+      border-radius: 10px;
+      touch-action: none;
+      will-change: transform;
+    }
+
+    .card-item.selected {
+      transform: translateY(-16px) scale(1.05);
+      box-shadow: 0 12px 24px rgba(234, 179, 8, 0.6), 0 0 0 2.5px #facc15;
+      z-index: 30;
+    }
+
+    .card-back {
+      background: repeating-linear-gradient(
+        45deg,
+        #1e3a8a,
+        #1e3a8a 6px,
+        #172554 6px,
+        #172554 12px
+      );
+      border: 1.5px solid #93c5fd;
+    }
+
+    .trump-glow {
+      box-shadow: 0 0 14px rgba(250, 204, 21, 0.55), inset 0 0 5px rgba(250, 204, 21, 0.25);
+      border-color: #facc15 !important;
+    }
+
+    .table-drop-hover {
+      box-shadow: inset 0 0 35px rgba(234, 179, 8, 0.45), 0 0 20px rgba(234, 179, 8, 0.35) !important;
+      border-color: rgba(250, 204, 21, 0.85) !important;
+      transform: scale(1.01);
+    }
+
+    .discard-drop-hover {
+      box-shadow: inset 0 0 25px rgba(244, 63, 94, 0.5) !important;
+      border-color: rgba(244, 63, 94, 0.8) !important;
+    }
+
+    .active-seat-ring {
+      box-shadow: 0 0 0 2px #facc15, 0 0 14px #eab308;
+    }
+
+    @keyframes pulse-fast {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+    }
+    .animate-pulse-fast {
+      animation: pulse-fast 1.4s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between h-screen text-slate-100 p-2 sm:p-3 max-w-md mx-auto relative antialiased select-none">
+
+  <!-- Yuqori Panel -->
+  <header class="flex items-center justify-between bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10 shadow-lg z-30">
+    <div class="flex items-center space-x-2">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-600 to-yellow-400 flex items-center justify-center font-cinzel font-black text-slate-950 text-xs shadow">
+        4K
+      </div>
+      <div>
+        <div class="flex items-center space-x-1.5">
+          <h1 class="text-xs font-bold tracking-wider text-amber-300 font-cinzel">BURA (31)</h1>
+          <span id="modeBadge" class="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded-full font-semibold">2 O'yinchi</span>
+          <span id="targetScoreBadge" class="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-semibold">31 pt</span>
+        </div>
+        <p id="roomStatusText" class="text-[10px] text-slate-300">Botga qarshi • 4 tadan karta</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-1">
+      <button id="openLobbyBtn" class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold text-[10px] transition shadow flex items-center space-x-1">
+        <span>👥</span>
+        <span>Rejim / Do'stlar</span>
+      </button>
+      <button id="soundBtn" class="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center transition border border-white/10 text-xs" title="Ovoz">
+        <span id="soundEmoji">🔊</span>
+      </button>
+      <button id="rulesBtn" class="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center transition border border-white/10 text-xs font-bold text-amber-300" title="Qoidalar">
+        ?
+      </button>
+    </div>
+  </header>
+
+  <!-- Raqiblar hududi (2, 3 yoki 4 kishilik moslashuvchan) -->
+  <section id="opponentsSection" class="grid grid-cols-1 gap-1.5 my-1 z-20 min-h-[78px]">
+    <!-- JavaScript orqali raqiblar joyi chiziladi -->
+  </section>
+
+  <!-- Markaziy O'yin Stoli -->
+  <main id="mainTable" class="relative flex-1 flex flex-col justify-center items-center my-0.5 rounded-3xl bg-emerald-950/55 border-2 border-emerald-500/30 shadow-2xl p-2.5 min-h-[180px] transition-all duration-200 z-10">
+    
+    <!-- O'yin xabarnomasi -->
+    <div id="tableBanner" class="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-black/80 backdrop-blur-md rounded-full border border-emerald-400/30 text-[10px] font-semibold text-emerald-300 shadow text-center whitespace-nowrap z-20">
+      Yangi partiya boshlandi!
+    </div>
+
+    <!-- Hozirgi hujum va himoyachi ko'rsatkichi -->
+    <div id="battleInfoBar" class="mt-4 mb-1 text-[10px] text-amber-200/90 font-medium bg-black/35 px-2.5 py-0.5 rounded-full border border-white/10">
+      Hujumda: <strong id="attackerNameLabel" class="text-amber-300">Siz</strong> ⚔️ Himoyada: <strong id="defenderNameLabel" class="text-sky-300">Bot 1</strong>
+    </div>
+
+    <div class="w-full flex items-center justify-between px-1 gap-2 flex-1">
+      <!-- Koloda va Kozir -->
+      <div class="relative flex items-center justify-center w-20 h-24 flex-shrink-0">
+        <div id="trumpCardElement" class="absolute left-1.5 transform -rotate-90 origin-center transition-all duration-300"></div>
+        <div id="deckStackElement" class="relative z-10 w-12 h-16 rounded-lg card-back flex flex-col items-center justify-center shadow-xl">
+          <span class="text-[8px] font-black text-amber-300 font-cinzel">BURA</span>
+          <span id="deckCountBadge" class="mt-0.5 text-[10px] font-bold bg-black/80 px-1.5 py-0.2 rounded text-white border border-white/20">
+            28
+          </span>
+        </div>
+      </div>
+
+      <!-- O'rtaga tashlangan kartalar -->
+      <div class="flex-1 flex flex-col items-center justify-center min-h-[120px] relative">
+        <div id="tableEmptyHint" class="text-center text-emerald-200/50 text-[11px] py-4 border-2 border-dashed border-emerald-500/20 rounded-2xl w-full">
+          👆 Kartani shu yerga<br>surib tashlang (1-4 ta)
+        </div>
+
+        <div id="trickArea" class="flex flex-col items-center justify-center space-y-1.5 w-full hidden">
+          <div class="flex flex-col items-center">
+            <span id="trickLeadLabel" class="text-[8px] uppercase tracking-wider text-amber-400 font-bold">Hujum kartalari</span>
+            <div id="leadCardsRow" class="flex justify-center items-center -space-x-1.5 sm:space-x-1"></div>
+          </div>
+
+          <div id="defendSection" class="flex flex-col items-center">
+            <span id="trickDefendLabel" class="text-[8px] uppercase tracking-wider text-sky-400 font-bold">Javob kartalari</span>
+            <div id="defendCardsRow" class="flex justify-center items-center -space-x-1.5 sm:space-x-1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kozir ma'lumoti -->
+    <div class="w-full flex items-center justify-between px-2 pt-1 text-[10px]">
+      <div id="onlineRoomIndicator" class="hidden items-center space-x-1 bg-sky-500/20 border border-sky-400/40 text-sky-200 px-2 py-0.5 rounded-lg">
+        <span>🌐 Xona:</span>
+        <strong id="activeRoomCodeBadge" class="font-mono text-amber-300">----</strong>
+        <button id="inviteTgBtn" class="ml-1 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-1.5 py-0.2 rounded text-[9px]">+ Taklif</button>
+      </div>
+      <div class="ml-auto flex items-center space-x-1 bg-black/50 px-2 py-0.5 rounded-lg border border-white/10">
+        <span class="text-slate-400">Kozir:</span>
+        <span id="trumpSuitIcon" class="text-sm font-bold leading-none">♠</span>
+        <span id="trumpSuitName" class="font-semibold text-amber-300">Qarg'a</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Boshqaruv va E'lon tugmalari -->
+  <section class="my-1 z-20">
+    <div class="flex items-center justify-between gap-1 mb-1">
+      <button id="claim31Btn" class="flex-1 py-1.5 px-2 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 active:scale-95 text-slate-950 font-extrabold text-[10px] rounded-xl shadow border border-yellow-200/50 transition flex items-center justify-center space-x-1">
+        <span>⚡ 31 Ochko E'lon Qilish!</span>
+      </button>
+
+      <button id="claimBuraBtn" class="hidden py-1.5 px-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 active:scale-95 text-white font-bold text-[10px] rounded-xl shadow border border-purple-300/50 animate-pulse-fast">
+        👑 BURA (4 Kozir)!
+      </button>
+
+      <button id="claimMoskvaBtn" class="hidden py-1.5 px-2.5 bg-gradient-to-r from-red-600 to-orange-500 active:scale-95 text-white font-bold text-[10px] rounded-xl shadow border border-red-300/50 animate-pulse-fast">
+        🔥 MOSKVA!
+      </button>
+    </div>
+
+    <div class="grid grid-cols-2 gap-1.5">
+      <button id="primaryActionBtn" class="py-2 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:pointer-events-none active:scale-95 text-white font-bold text-xs rounded-xl shadow-lg border border-emerald-400/40 transition flex items-center justify-center">
+        <span id="primaryActionText">Yurish</span>
+      </button>
+
+      <button id="secondaryActionBtn" class="py-2 px-3 bg-rose-900/80 hover:bg-rose-800 disabled:opacity-40 disabled:pointer-events-none active:scale-95 text-rose-100 font-semibold text-xs rounded-xl shadow border border-rose-500/30 transition flex items-center justify-center">
+        <span>🏳️ Yopib tashlash</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Sizning (O'yinchi) hududingiz: 4 ta karta -->
+  <footer id="playerFooter" class="flex flex-col items-center relative z-30 rounded-2xl p-1 bg-black/25 border border-white/5 transition-all">
+    <div class="flex items-center justify-between w-full px-2 mb-0.5">
+      <div class="flex items-center space-x-2">
+        <div id="myAvatarBox" class="w-7 h-7 rounded-full bg-gradient-to-tr from-sky-600 to-blue-500 border border-sky-300 flex items-center justify-center text-xs shadow">
+          👤
+        </div>
+        <div>
+          <div class="flex items-center space-x-1.5">
+            <span class="text-xs font-bold text-white" id="playerNameLabel">Siz</span>
+            <span id="playerRoleBadge" class="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Navbat sizda</span>
+          </div>
+          <div class="text-[9px] text-slate-400">
+            Raund: <strong id="playerRoundPtsCount" class="text-amber-300">0</strong> pt | Jami: <strong id="playerTotalScoreCount" class="text-emerald-300">0</strong> / <span id="footerTargetScore">31</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-black/50 border border-white/10 px-2.5 py-0.5 rounded-xl text-right">
+        <span class="text-[8px] text-slate-400 block uppercase">Raund / Marra</span>
+        <span class="text-xs font-black text-amber-400" id="playerPointsDisplay">0 / 31 pt</span>
+      </div>
+    </div>
+
+    <div class="text-[9px] text-emerald-300/90 font-medium mb-0.5 text-center">
+      👆 Stolga suring (yurish/urish) • 👇 Pastga suring (yopib tashlash)
+    </div>
+
+    <!-- Qo'ldagi 4 ta karta -->
+    <div id="playerCardsContainer" class="flex justify-center items-end space-x-1.5 sm:space-x-2.5 h-24 sm:h-28 w-full pt-1 pb-1 px-1"></div>
+  </footer>
+
+  <!-- MODAL: O'yin Rejimi va Do'stlar bilan o'ynash (Lobby) -->
+  <div id="lobbyModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-3xl p-4 max-w-sm w-full shadow-2xl flex flex-col space-y-3.5 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
+        <div class="flex items-center space-x-2">
+          <span class="text-xl">🃏</span>
+          <div>
+            <h2 class="text-sm font-black text-amber-300 font-cinzel">BURA (31) — 4 KARTA</h2>
+            <p class="text-[10px] text-slate-400">O'yin rejimini va o'yinchilar sonini tanlang</p>
+          </div>
+        </div>
+        <button id="closeLobbyBtn" class="text-slate-400 hover:text-white text-base px-2">✕</button>
+      </div>
+
+      <!-- O'yinchilar soni tanlovi (2, 3, 4 kishi) -->
+      <div>
+        <label class="text-[11px] font-bold text-amber-300 uppercase tracking-wider block mb-1.5">
+          1. O'yinchilar sonini tanlang:
+        </label>
+        <div class="grid grid-cols-3 gap-2">
+          <button data-count="2" class="player-count-btn py-2.5 px-2 rounded-2xl border-2 border-amber-400 bg-amber-500/20 text-white font-bold text-xs flex flex-col items-center transition">
+            <span class="text-base mb-0.5">👤 vs 👤</span>
+            <span>2 Kishi</span>
+            <span class="text-[9px] text-amber-300 font-normal">Klassik duel</span>
+          </button>
+          <button data-count="3" class="player-count-btn py-2.5 px-2 rounded-2xl border border-white/15 bg-white/5 text-slate-300 font-bold text-xs flex flex-col items-center transition">
+            <span class="text-base mb-0.5">📐 3x</span>
+            <span>3 Kishi</span>
+            <span class="text-[9px] text-slate-400 font-normal">Aylana stol</span>
+          </button>
+          <button data-count="4" class="player-count-btn py-2.5 px-2 rounded-2xl border border-white/15 bg-white/5 text-slate-300 font-bold text-xs flex flex-col items-center transition">
+            <span class="text-base mb-0.5">🎲 4x</span>
+            <span>4 Kishi</span>
+            <span class="text-[9px] text-slate-400 font-normal">Katta stol</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- G'alaba ochkosi (Marra) tanlovi: 31, 61, 101, 120 va ixtiyoriy -->
+      <div>
+        <label class="text-[11px] font-bold text-amber-300 uppercase tracking-wider block mb-1.5">
+          2. Necha ochkogacha o'ynaladi? (Marra):
+        </label>
+        <div class="grid grid-cols-4 gap-1.5 mb-2">
+          <button data-target="31" class="target-score-btn py-2 px-1 rounded-xl border-2 border-amber-400 bg-amber-500/20 text-white font-bold text-xs flex flex-col items-center transition">
+            <span>31 pt</span>
+            <span class="text-[8px] text-amber-300 font-normal">1 partiya</span>
+          </button>
+          <button data-target="61" class="target-score-btn py-2 px-1 rounded-xl border border-white/15 bg-white/5 text-slate-300 font-bold text-xs flex flex-col items-center transition">
+            <span>61 pt</span>
+            <span class="text-[8px] text-slate-400 font-normal">Tezkor</span>
+          </button>
+          <button data-target="101" class="target-score-btn py-2 px-1 rounded-xl border border-white/15 bg-white/5 text-slate-300 font-bold text-xs flex flex-col items-center transition">
+            <span>101 pt</span>
+            <span class="text-[8px] text-slate-400 font-normal">O'rtacha</span>
+          </button>
+          <button data-target="120" class="target-score-btn py-2 px-1 rounded-xl border border-white/15 bg-white/5 text-slate-300 font-bold text-xs flex flex-col items-center transition">
+            <span>120 pt</span>
+            <span class="text-[8px] text-slate-400 font-normal">Marafon</span>
+          </button>
+        </div>
+        <div class="flex items-center space-x-2 bg-black/40 p-1.5 rounded-xl border border-white/10">
+          <span class="text-[10px] text-slate-300 pl-1">Boshqa ochko:</span>
+          <input id="customTargetInput" type="number" min="11" max="1000" placeholder="Masalan: 150" class="flex-1 bg-black/60 border border-white/20 rounded-lg px-2 py-1 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-400">
+          <button id="applyCustomTargetBtn" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 rounded-lg text-[10px] font-bold transition">
+            Tanlash
+          </button>
+        </div>
+      </div>
+
+      <!-- Bot bilan darhol o'ynash -->
+      <div class="bg-emerald-950/60 border border-emerald-500/30 rounded-2xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <h3 class="text-xs font-bold text-emerald-300">🤖 Botlar bilan mashq</h3>
+            <p class="text-[10px] text-slate-300">Internet talab qilinmaydi, darhol boshlanadi</p>
+          </div>
+        </div>
+        <button id="startBotGameBtn" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-green-500 hover:from-emerald-500 hover:to-green-400 active:scale-95 text-white font-black text-xs rounded-xl shadow-lg transition">
+          🚀 Botlar bilan o'ynashni boshlash
+        </button>
+      </div>
+
+      <!-- Telegramda Do'stlar bilan Onlayn o'ynash -->
+      <div class="bg-sky-950/50 border border-sky-500/30 rounded-2xl p-3 space-y-2.5">
+        <div>
+          <h3 class="text-xs font-bold text-sky-300 flex items-center space-x-1.5">
+            <span>📲 Telegramda Do'stlar bilan O'ynash</span>
+          </h3>
+          <p class="text-[10px] text-slate-300 mt-0.5">
+            Xona yarating va Telegram orqali do'stlaringizga taklifnoma yuboring yoki xona kodini kiriting.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button id="createRoomBtn" class="py-2 px-2 bg-sky-500 hover:bg-sky-400 active:scale-95 text-slate-950 font-extrabold text-[11px] rounded-xl shadow transition">
+            ➕ Yangi Xona Yaratish
+          </button>
+          <button id="shareTelegramBtn" class="py-2 px-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-[11px] rounded-xl shadow transition">
+            📤 Do'stni Taklif Qilish
+          </button>
+        </div>
+
+        <!-- Xonaga kod orqali kirish -->
+        <div class="pt-1 border-t border-white/10">
+          <label class="text-[10px] text-slate-300 block mb-1">Do'stingiz xona kodini berdimi?</label>
+          <div class="flex space-x-1.5">
+            <input id="joinRoomInput" type="text" maxlength="6" placeholder="Kodni kiriting (masalan: 7742)" class="flex-1 bg-black/50 border border-white/20 rounded-xl px-2.5 py-1.5 text-xs text-white uppercase font-mono focus:outline-none focus:border-amber-400">
+            <button id="joinRoomBtn" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl">
+              Kirish
+            </button>
+          </div>
+          <p id="lobbyFeedbackMsg" class="text-[10px] text-amber-300 mt-1 hidden"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Qoidalar (4 kartalik Bura) -->
+  <div id="rulesModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-amber-500/40 rounded-3xl p-5 max-w-sm w-full max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between pb-2.5 border-b border-white/10">
+        <h2 class="text-sm font-bold text-amber-300 font-cinzel">📖 4 Kartalik Bura (31) Qoidalari</h2>
+        <button id="closeRulesBtn" class="text-slate-400 hover:text-white text-lg px-2">✕</button>
+      </div>
+      <div class="overflow-y-auto text-xs text-slate-300 space-y-2.5 my-3 pr-1">
+        <p><strong class="text-amber-400">4 Kartalik Bura:</strong> Har bir o'yinchiga kolodadan <strong>4 tadan karta</strong> tarqatiladi. Har vzyatkadan keyin qo'ldagi kartalar yana 4 taga to'ldiriladi.</p>
+        <p><strong class="text-amber-400">2, 3 va 4 kishilik rejim:</strong> Stol atrofida 2, 3 yoki 4 kishi o'ynashi mumkin. Hujumchi soat mili bo'ylab keyingi o'yinchiga hujum qiladi. Kim vzyatkani olsa, keyingi yurishni o'sha o'yinchi boshlaydi.</p>
+        <div class="bg-black/40 p-2.5 rounded-xl border border-white/5 grid grid-cols-2 gap-1 text-[11px]">
+          <div><strong class="text-amber-300">Tuz (A):</strong> 11 ochko</div>
+          <div><strong class="text-amber-300">O'nlik (10):</strong> 10 ochko</div>
+          <div><strong class="text-amber-300">Qirol (K):</strong> 4 ochko</div>
+          <div><strong class="text-amber-300">Dama (Q):</strong> 3 ochko</div>
+          <div><strong class="text-amber-300">Valet (J):</strong> 2 ochko</div>
+          <div><strong class="text-slate-400">9, 8, 7, 6:</strong> 0 ochko</div>
+        </div>
+        <p><strong class="text-purple-400">BURA kombinatsiyasi:</strong> Qo'lda 4 ta kozir yig'ilsa — darhol g'alaba!</p>
+        <p><strong class="text-red-400">MOSKVA kombinatsiyasi:</strong> Qo'lda 4 ta Tuz (yoki 3 ta Tuz kozir tuzi bilan) bo'lsa — avto-g'alaba!</p>
+      </div>
+      <button id="closeRulesBottomBtn" class="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs">
+        Tushunarli
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: Partiya natijasi -->
+  <div id="resultModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-gradient-to-b from-slate-900 to-emerald-950 border border-amber-500/50 rounded-3xl p-5 max-w-sm w-full text-center shadow-2xl">
+      <div id="resultIcon" class="text-4xl mb-1 animate-bounce">🏆</div>
+      <h2 id="resultTitle" class="text-lg font-black text-amber-300 font-cinzel mb-1">G'ALABA!</h2>
+      <p id="resultDesc" class="text-xs text-slate-200 mb-3 leading-relaxed"></p>
+
+      <!-- Barcha o'yinchilar ochkolari jadvali -->
+      <div id="resultScoresList" class="bg-black/45 border border-white/10 rounded-2xl p-3 mb-4 text-xs text-slate-200 space-y-1.5"></div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button id="changeModeAfterBtn" class="py-2.5 bg-white/10 hover:bg-white/20 text-slate-200 font-semibold text-xs rounded-xl border border-white/15">
+          ⚙️ Stolni o'zgartirish
+        </button>
+        <button id="nextRoundBtn" class="py-2.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs rounded-xl shadow-lg">
+          Yana o'ynash ➔
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase (Do'stlar bilan real-vaqtda xona orqali o'ynash uchun) va O'yin Mantig'i -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- Ovoz sintezatori ---
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      playTone(freq, type, duration, delay = 0, vol = 0.12) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime + delay);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + delay + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(this.ctx.currentTime + delay);
+          osc.stop(this.ctx.currentTime + delay + duration);
+        } catch (e) {}
+      }
+      tap() { this.playTone(380, 'triangle', 0.05, 0, 0.08); }
+      playCard() {
+        this.playTone(460, 'sine', 0.08, 0, 0.12);
+        this.playTone(620, 'sine', 0.07, 0.03, 0.08);
+      }
+      takeTrick() {
+        this.playTone(523.25, 'triangle', 0.11, 0, 0.14);
+        this.playTone(659.25, 'triangle', 0.15, 0.08, 0.14);
+      }
+      win() {
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.playTone(f, 'sine', 0.2, i * 0.09, 0.18));
+      }
+      lose() {
+        [400, 340, 280].forEach((f, i) => this.playTone(f, 'sawtooth', 0.2, i * 0.12, 0.12));
+      }
+    }
+
+    const sound = new SoundFX();
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    function haptic(type = 'impact') {
+      try {
+        if (tg?.HapticFeedback) {
+          if (type === 'impact') tg.HapticFeedback.impactOccurred('light');
+          if (type === 'success') tg.HapticFeedback.notificationOccurred('success');
+          if (type === 'error') tg.HapticFeedback.notificationOccurred('error');
+        }
+      } catch (e) {}
+    }
+
+    // --- Karta konstantalari (4 tadan tarqatiladi) ---
+    const HAND_SIZE = 4; // Foydalanuvchi talabiga binoan 4 tadan karta
+    const SUITS = [
+      { id: 'spades', symbol: '♠', name: "Qarg'a", color: 'black' },
+      { id: 'hearts', symbol: '♥', name: 'Qizil', color: 'red' },
+      { id: 'diamonds', symbol: '♦', name: "G'isht", color: 'red' },
+      { id: 'clubs', symbol: '♣', name: 'Xoch', color: 'black' }
+    ];
+
+    const RANKS = [
+      { rank: '6', value: 1, points: 0 },
+      { rank: '7', value: 2, points: 0 },
+      { rank: '8', value: 3, points: 0 },
+      { rank: '9', value: 4, points: 0 },
+      { rank: 'J', value: 5, points: 2 },
+      { rank: 'Q', value: 6, points: 3 },
+      { rank: 'K', value: 7, points: 4 },
+      { rank: '10', value: 8, points: 10 },
+      { rank: 'A', value: 9, points: 11 }
+    ];
+
+    // --- O'yin holati ---
+    const myTelegramName = tg?.initDataUnsafe?.user?.first_name || "Siz";
+    const state = {
+      playerCount: 2, // 2, 3 yoki 4 kishi
+      targetScore: 31, // 31, 61, 101, 120 yoki ixtiyoriy ochkogacha
+      roundNumber: 1,
+      isOnlineRoom: false,
+      roomCode: null,
+      mySeatIndex: 0,
+      players: [], // Har bir o'yinchi: { id, name, avatar, hand, wonCards, totalScore, wins, isBot }
+      deck: [],
+      trumpCard: null,
+      trumpSuit: null,
+      attackerIndex: 0,
+      defenderIndex: 1,
+      phase: 'lead', // 'lead' (hujum) yoki 'defend' (javob)
+      tableLead: [],
+      tableDefend: [],
+      selectedCardIds: [],
+      isGameOver: false,
+      isMatchOver: false,
+      botBusy: false
+    };
+
+    // --- Firebase (agar mavjud bo'lsa onlayn sinxronizatsiya uchun) ---
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+    let roomUnsubscribe = null;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'bura-31-miniapp';
+
+    async function initCloudSync() {
+      try {
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+          const config = JSON.parse(__firebase_config);
+          const app = initializeApp(config);
+          auth = getAuth(app);
+          db = getFirestore(app);
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } else {
+            await signInAnonymously(auth);
+          }
+          currentUser = auth.currentUser;
+        }
+      } catch (e) {
+        console.warn("Local mode active");
+      }
+    }
+    initCloudSync();
+
+    // --- DOM elementlar ---
+    const el = {
+      modeBadge: document.getElementById('modeBadge'),
+      targetScoreBadge: document.getElementById('targetScoreBadge'),
+      roomStatusText: document.getElementById('roomStatusText'),
+      openLobbyBtn: document.getElementById('openLobbyBtn'),
+      lobbyModal: document.getElementById('lobbyModal'),
+      closeLobbyBtn: document.getElementById('closeLobbyBtn'),
+      playerCountBtns: document.querySelectorAll('.player-count-btn'),
+      targetScoreBtns: document.querySelectorAll('.target-score-btn'),
+      customTargetInput: document.getElementById('customTargetInput'),
+      applyCustomTargetBtn: document.getElementById('applyCustomTargetBtn'),
+      startBotGameBtn: document.getElementById('startBotGameBtn'),
+      createRoomBtn: document.getElementById('createRoomBtn'),
+      shareTelegramBtn: document.getElementById('shareTelegramBtn'),
+      joinRoomInput: document.getElementById('joinRoomInput'),
+      joinRoomBtn: document.getElementById('joinRoomBtn'),
+      lobbyFeedbackMsg: document.getElementById('lobbyFeedbackMsg'),
+      onlineRoomIndicator: document.getElementById('onlineRoomIndicator'),
+      activeRoomCodeBadge: document.getElementById('activeRoomCodeBadge'),
+      inviteTgBtn: document.getElementById('inviteTgBtn'),
+      opponentsSection: document.getElementById('opponentsSection'),
+      mainTable: document.getElementById('mainTable'),
+      tableBanner: document.getElementById('tableBanner'),
+      attackerNameLabel: document.getElementById('attackerNameLabel'),
+      defenderNameLabel: document.getElementById('defenderNameLabel'),
+      trumpCardElement: document.getElementById('trumpCardElement'),
+      deckStackElement: document.getElementById('deckStackElement'),
+      deckCountBadge: document.getElementById('deckCountBadge'),
+      tableEmptyHint: document.getElementById('tableEmptyHint'),
+      trickArea: document.getElementById('trickArea'),
+      leadCardsRow: document.getElementById('leadCardsRow'),
+      defendCardsRow: document.getElementById('defendCardsRow'),
+      defendSection: document.getElementById('defendSection'),
+      trumpSuitIcon: document.getElementById('trumpSuitIcon'),
+      trumpSuitName: document.getElementById('trumpSuitName'),
+      claim31Btn: document.getElementById('claim31Btn'),
+      claimBuraBtn: document.getElementById('claimBuraBtn'),
+      claimMoskvaBtn: document.getElementById('claimMoskvaBtn'),
+      primaryActionBtn: document.getElementById('primaryActionBtn'),
+      primaryActionText: document.getElementById('primaryActionText'),
+      secondaryActionBtn: document.getElementById('secondaryActionBtn'),
+      playerFooter: document.getElementById('playerFooter'),
+      playerNameLabel: document.getElementById('playerNameLabel'),
+      playerRoleBadge: document.getElementById('playerRoleBadge'),
+      playerRoundPtsCount: document.getElementById('playerRoundPtsCount'),
+      playerTotalScoreCount: document.getElementById('playerTotalScoreCount'),
+      footerTargetScore: document.getElementById('footerTargetScore'),
+      playerPointsDisplay: document.getElementById('playerPointsDisplay'),
+      playerCardsContainer: document.getElementById('playerCardsContainer'),
+      soundBtn: document.getElementById('soundBtn'),
+      soundEmoji: document.getElementById('soundEmoji'),
+      rulesBtn: document.getElementById('rulesBtn'),
+      rulesModal: document.getElementById('rulesModal'),
+      closeRulesBtn: document.getElementById('closeRulesBtn'),
+      closeRulesBottomBtn: document.getElementById('closeRulesBottomBtn'),
+      resultModal: document.getElementById('resultModal'),
+      resultIcon: document.getElementById('resultIcon'),
+      resultTitle: document.getElementById('resultTitle'),
+      resultDesc: document.getElementById('resultDesc'),
+      resultScoresList: document.getElementById('resultScoresList'),
+      changeModeAfterBtn: document.getElementById('changeModeAfterBtn'),
+      nextRoundBtn: document.getElementById('nextRoundBtn')
+    };
+
+    el.playerNameLabel.innerText = myTelegramName;
+
+    // --- Koloda yaratish ---
+    function createDeck() {
+      const deck = [];
+      let id = 1;
+      for (const suit of SUITS) {
+        for (const r of RANKS) {
+          deck.push({
+            id: `c_${id++}`,
+            suit: suit.id,
+            suitSymbol: suit.symbol,
+            suitColor: suit.color,
+            suitName: suit.name,
+            rank: r.rank,
+            value: r.value,
+            points: r.points
+          });
+        }
+      }
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+      return deck;
+    }
+
+    function calculatePoints(cards) {
+      return (cards || []).reduce((sum, c) => sum + (c.points || 0), 0);
+    }
+
+    // --- Kartalar HTML shabloni ---
+    function createCardHTML(card, isFaceUp = true, isSelected = false, sizeMode = 'player') {
+      if (!isFaceUp) {
+        const backDims = sizeMode === 'mini' ? 'w-7 h-10 rounded-md' : 'w-11 h-15 rounded-lg';
+        return `
+          <div class="card-item card-back ${backDims} shadow flex items-center justify-center">
+            <span class="text-[7px] text-blue-200 font-cinzel font-bold">31</span>
+          </div>
+        `;
+      }
+
+      const isTrump = card.suit === state.trumpSuit;
+      const isRed = card.suitColor === 'red';
+      const textColor = isRed ? 'text-rose-600' : 'text-slate-900';
+
+      const sizeClasses = sizeMode === 'table'
+        ? 'w-11 h-16 text-xs p-1'
+        : 'w-14 h-22 sm:w-16 sm:h-24 text-xs sm:text-sm p-1.5';
+
+      return `
+        <div data-card-id="${card.id}" class="card-item ${isSelected ? 'selected' : ''} ${isTrump ? 'trump-glow' : ''} ${sizeClasses} bg-gradient-to-b from-white to-slate-100 rounded-xl flex flex-col justify-between cursor-grab active:cursor-grabbing border ${isTrump ? 'border-yellow-400' : 'border-slate-300'}">
+          <div class="flex items-center justify-between leading-none pointer-events-none">
+            <span class="font-black ${textColor} font-cinzel text-[11px] sm:text-xs">${card.rank}</span>
+            <span class="${textColor} text-[11px] sm:text-xs">${card.suitSymbol}</span>
+          </div>
+
+          <div class="flex flex-col items-center justify-center my-auto pointer-events-none">
+            <span class="${textColor} text-lg sm:text-xl leading-none">${card.suitSymbol}</span>
+            ${card.points > 0 ? `<span class="text-[8px] font-extrabold text-amber-900 bg-amber-200/90 px-1 rounded leading-tight mt-0.5">${card.points}p</span>` : ''}
+          </div>
+
+          <div class="flex items-center justify-between leading-none transform rotate-180 pointer-events-none">
+            <span class="font-black ${textColor} font-cinzel text-[11px] sm:text-xs">${card.rank}</span>
+            <span class="${textColor} text-[11px] sm:text-xs">${card.suitSymbol}</span>
+          </div>
+
+          ${isTrump ? `<div class="pointer-events-none absolute -top-1 -right-1 w-3.5 h-3.5 bg-yellow-400 text-slate-950 rounded-full flex items-center justify-center text-[8px] font-black shadow">★</div>` : ''}
+        </div>
+      `;
+    }
+
+    // --- Karta urish qoidalari ---
+    function doesCardBeat(defCard, leadCard, trumpSuit) {
+      if (defCard.suit === leadCard.suit) return defCard.value > leadCard.value;
+      if (defCard.suit === trumpSuit && leadCard.suit !== trumpSuit) return true;
+      return false;
+    }
+
+    function canBeatAll(leadCards, defendCards, trumpSuit) {
+      if (leadCards.length !== defendCards.length) return false;
+      function perms(arr) {
+        if (arr.length <= 1) return [arr];
+        const res = [];
+        for (let i = 0; i < arr.length; i++) {
+          const rest = perms(arr.slice(0, i).concat(arr.slice(i + 1)));
+          for (const p of rest) res.push([arr[i], ...p]);
+        }
+        return res;
+      }
+      for (const p of perms(defendCards)) {
+        if (p.every((dCard, idx) => doesCardBeat(dCard, leadCards[idx], trumpSuit))) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    // 4 Kartalik Bura va Moskva kombinatsiyalari
+    function checkCombinations(hand, trumpSuit) {
+      if (!hand || hand.length < 4) return { bura: false, moskva: false };
+      const allTrumps = hand.every(c => c.suit === trumpSuit);
+      const acesCount = hand.filter(c => c.rank === 'A').length;
+      const hasTrumpAce = hand.some(c => c.rank === 'A' && c.suit === trumpSuit);
+      return {
+        bura: allTrumps, // 4 ta kozir = Bura!
+        moskva: acesCount === 4 || (acesCount === 3 && hasTrumpAce) // 4 ta Tuz yoki Kozir Tuzi bilan 3 ta Tuz
+      };
+    }
+
+    function setBanner(text, type = "info") {
+      el.tableBanner.innerText = text;
+      if (type === "warn") {
+        el.tableBanner.className = "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-rose-950/90 rounded-full border border-rose-500/60 text-[10px] font-bold text-rose-200 shadow text-center whitespace-nowrap z-20";
+      } else if (type === "win") {
+        el.tableBanner.className = "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-amber-950/90 rounded-full border border-yellow-400/60 text-[10px] font-bold text-yellow-300 shadow text-center whitespace-nowrap z-20 animate-pulse-fast";
+      } else {
+        el.tableBanner.className = "absolute top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-black/80 rounded-full border border-emerald-400/30 text-[10px] font-semibold text-emerald-300 shadow text-center whitespace-nowrap z-20";
+      }
+    }
+
+    // --- Raqiblar va O'yinchi ekranini yangilash ---
+    function renderOpponents() {
+      const opponents = state.players
+        .map((p, idx) => ({ ...p, seatIndex: idx }))
+        .filter(p => p.seatIndex !== state.mySeatIndex);
+
+      if (opponents.length === 1) {
+        el.opponentsSection.className = "grid grid-cols-1 gap-1.5 my-1 z-20";
+      } else if (opponents.length === 2) {
+        el.opponentsSection.className = "grid grid-cols-2 gap-1.5 my-1 z-20";
+      } else {
+        el.opponentsSection.className = "grid grid-cols-3 gap-1.5 my-1 z-20";
+      }
+
+      el.opponentsSection.innerHTML = opponents.map(opp => {
+        const isAttacker = state.attackerIndex === opp.seatIndex;
+        const isDefender = state.defenderIndex === opp.seatIndex;
+        const activeTurn = (state.phase === 'lead' && isAttacker) || (state.phase === 'defend' && isDefender);
+
+        let roleBadge = `<span class="text-[8px] px-1.5 py-0.2 rounded-full bg-white/10 text-slate-300">Kutmoqda</span>`;
+        if (isAttacker) {
+          roleBadge = `<span class="text-[8px] px-1.5 py-0.2 rounded-full bg-amber-500/25 text-amber-300 border border-amber-400/40 font-bold">⚔️ Hujum</span>`;
+        } else if (isDefender) {
+          roleBadge = `<span class="text-[8px] px-1.5 py-0.2 rounded-full bg-sky-500/25 text-sky-300 border border-sky-400/40 font-bold">🛡️ Himoya</span>`;
+        }
+
+        const miniCards = opp.hand.map(() => createCardHTML(null, false, false, 'mini')).join('');
+        const oppRoundPts = calculatePoints(opp.wonCards);
+
+        return `
+          <div class="bg-black/40 backdrop-blur-sm rounded-2xl p-2 border ${activeTurn ? 'active-seat-ring border-amber-400' : 'border-white/10'} flex flex-col justify-between transition-all">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <div class="flex items-center space-x-1.5 truncate">
+                <div class="w-6 h-6 rounded-full bg-slate-800 border border-emerald-400/50 flex items-center justify-center text-xs flex-shrink-0">
+                  ${opp.avatar}
+                </div>
+                <div class="truncate">
+                  <div class="text-[10px] font-bold text-slate-100 truncate">${opp.name}</div>
+                  <div class="text-[8px] text-slate-400">Jami: <strong class="text-emerald-300">${opp.totalScore || 0}/${state.targetScore}</strong> | Karta: <strong class="text-amber-300">${opp.wonCards.length}</strong></div>
+                </div>
+              </div>
+              ${roleBadge}
+            </div>
+            <div class="flex justify-center items-center -space-x-2 h-10 mt-0.5">
+              ${miniCards || '<span class="text-[9px] text-slate-500">Bo\'sh</span>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateUI() {
+      const me = state.players[state.mySeatIndex];
+      if (!me) return;
+
+      el.modeBadge.innerText = `${state.playerCount} O'yinchi`;
+      el.targetScoreBadge.innerText = `Marra: ${state.targetScore} pt`;
+      el.footerTargetScore.innerText = state.targetScore;
+      el.deckCountBadge.innerText = state.deck.length;
+
+      if (state.trumpCard) {
+        el.trumpCardElement.innerHTML = createCardHTML(state.trumpCard, true, false, 'table');
+        const suitObj = SUITS.find(s => s.id === state.trumpSuit);
+        el.trumpSuitIcon.innerText = suitObj.symbol;
+        el.trumpSuitIcon.style.color = suitObj.color === 'red' ? '#fb7185' : '#f8fafc';
+        el.trumpSuitName.innerText = suitObj.name;
+      }
+
+      if (state.deck.length === 0) {
+        el.deckStackElement.style.opacity = '0.25';
+        el.trumpCardElement.style.display = 'none';
+      } else {
+        el.deckStackElement.style.opacity = '1';
+        el.trumpCardElement.style.display = 'block';
+      }
+
+      // Hujumchi va Himoyachi nomlari
+      const attacker = state.players[state.attackerIndex];
+      const defender = state.players[state.defenderIndex];
+      el.attackerNameLabel.innerText = attacker ? attacker.name : '-';
+      el.defenderNameLabel.innerText = defender ? defender.name : '-';
+
+      renderOpponents();
+
+      // Mening kartalarim (4 ta)
+      el.playerCardsContainer.innerHTML = me.hand.map(card => {
+        const isSelected = state.selectedCardIds.includes(card.id);
+        return createCardHTML(card, true, isSelected, 'player');
+      }).join('');
+
+      el.playerCardsContainer.querySelectorAll('.card-item').forEach(cardEl => {
+        setupCardGestures(cardEl);
+      });
+
+      const myPts = calculatePoints(me.wonCards);
+      const myProjectedTotal = (me.totalScore || 0) + myPts;
+      el.playerRoundPtsCount.innerText = myPts;
+      el.playerTotalScoreCount.innerText = myProjectedTotal;
+      el.playerPointsDisplay.innerText = `${myPts} pt (Jami: ${myProjectedTotal}/${state.targetScore})`;
+
+      if (state.targetScore <= 31) {
+        el.claim31Btn.innerHTML = `<span>⚡ 31 Ochko E'lon Qilish!</span>`;
+      } else {
+        el.claim31Btn.innerHTML = `<span>⚡ 31+ (Raund) / ${state.targetScore} (Marra) E'lon!</span>`;
+      }
+
+      const isMyAttack = state.attackerIndex === state.mySeatIndex;
+      const isMyDefense = state.defenderIndex === state.mySeatIndex;
+      const isMyActiveTurn = (state.phase === 'lead' && isMyAttack) || (state.phase === 'defend' && isMyDefense);
+
+      el.playerFooter.classList.toggle('active-seat-ring', isMyActiveTurn);
+
+      if (isMyAttack && state.phase === 'lead') {
+        el.playerRoleBadge.innerText = '⚔️ Siz hujumdasiz';
+        el.playerRoleBadge.className = 'text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/25 text-amber-300 border border-amber-400/50 font-bold';
+      } else if (isMyDefense && state.phase === 'defend') {
+        el.playerRoleBadge.innerText = '🛡️ Siz himoyadasiz';
+        el.playerRoleBadge.className = 'text-[9px] px-1.5 py-0.2 rounded-full bg-sky-500/25 text-sky-300 border border-sky-400/50 font-bold';
+      } else {
+        el.playerRoleBadge.innerText = '⏳ Navbat kutilmoqda';
+        el.playerRoleBadge.className = 'text-[9px] px-1.5 py-0.2 rounded-full bg-white/10 text-slate-300';
+      }
+
+      // Stol markazi
+      if (state.tableLead.length === 0 && state.tableDefend.length === 0) {
+        el.tableEmptyHint.classList.remove('hidden');
+        el.trickArea.classList.add('hidden');
+      } else {
+        el.tableEmptyHint.classList.add('hidden');
+        el.trickArea.classList.remove('hidden');
+        el.leadCardsRow.innerHTML = state.tableLead.map(c => createCardHTML(c, true, false, 'table')).join('');
+
+        if (state.tableDefend.length > 0) {
+          el.defendSection.classList.remove('hidden');
+          el.defendCardsRow.innerHTML = state.tableDefend.map(c => {
+            return c.hiddenDiscard ? createCardHTML(null, false, false, 'mini') : createCardHTML(c, true, false, 'table');
+          }).join('');
+        } else {
+          el.defendSection.classList.add('hidden');
+          el.defendCardsRow.innerHTML = '';
+        }
+      }
+
+      // Bura (4 kozir) yoki Moskva tekshiruvi
+      const combos = checkCombinations(me.hand, state.trumpSuit);
+      el.claimBuraBtn.classList.toggle('hidden', !combos.bura);
+      el.claimMoskvaBtn.classList.toggle('hidden', !combos.moskva);
+
+      updateActionButtons();
+    }
+
+    function updateActionButtons() {
+      const me = state.players[state.mySeatIndex];
+      if (!me) return;
+      const selCount = state.selectedCardIds.length;
+      const selectedCards = me.hand.filter(c => state.selectedCardIds.includes(c.id));
+
+      const isMyLead = state.attackerIndex === state.mySeatIndex && state.phase === 'lead';
+      const isMyDefend = state.defenderIndex === state.mySeatIndex && state.phase === 'defend';
+
+      if (isMyLead) {
+        el.secondaryActionBtn.classList.add('hidden');
+        el.primaryActionBtn.classList.remove('hidden');
+        el.primaryActionBtn.className = "col-span-2 py-2 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:pointer-events-none active:scale-95 text-white font-bold text-xs rounded-xl shadow-lg border border-emerald-400/40 transition flex items-center justify-center";
+        if (selCount === 0) {
+          el.primaryActionText.innerText = "Yurish uchun karta tanlang yoki stolga suring 👆";
+          el.primaryActionBtn.disabled = true;
+        } else {
+          el.primaryActionText.innerText = `🎯 ${selCount} ta karta bilan hujum qilish`;
+          el.primaryActionBtn.disabled = false;
+        }
+      } else if (isMyDefend) {
+        el.secondaryActionBtn.classList.remove('hidden');
+        el.primaryActionBtn.classList.remove('hidden');
+        el.primaryActionBtn.className = "py-2 px-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:pointer-events-none active:scale-95 text-white font-bold text-xs rounded-xl shadow-lg border border-emerald-400/40 transition flex items-center justify-center";
+
+        const needed = state.tableLead.length;
+        if (selCount === needed) {
+          const canBeat = canBeatAll(state.tableLead, selectedCards, state.trumpSuit);
+          el.primaryActionText.innerText = canBeat ? "⚔️ Urib olish" : "Ura olmaysiz";
+          el.primaryActionBtn.disabled = !canBeat;
+          el.secondaryActionBtn.disabled = false;
+          el.secondaryActionBtn.innerText = `🏳️ Tashlash (${needed} ta)`;
+        } else {
+          el.primaryActionText.innerText = `⚔️ Urish (${selCount}/${needed})`;
+          el.primaryActionBtn.disabled = true;
+          el.secondaryActionBtn.disabled = true;
+          el.secondaryActionBtn.innerText = `🏳️ Tashlash (${selCount}/${needed})`;
+        }
+      } else {
+        el.secondaryActionBtn.classList.add('hidden');
+        el.primaryActionBtn.className = "col-span-2 py-2 px-4 bg-slate-800 text-slate-400 font-semibold text-xs rounded-xl border border-white/10 flex items-center justify-center";
+        el.primaryActionBtn.disabled = true;
+        const activePlayer = state.phase === 'lead' ? state.players[state.attackerIndex] : state.players[state.defenderIndex];
+        el.primaryActionText.innerText = `⏳ ${activePlayer ? activePlayer.name : 'Raqib'} yurishi kutilmoqda...`;
+      }
+    }
+
+    // --- Karta tanlash va Sensorli Surish (Swipe / Drag) ---
+    function toggleCardSelection(cardId) {
+      if (state.isGameOver || state.botBusy) return;
+      const me = state.players[state.mySeatIndex];
+      const isMyLead = state.attackerIndex === state.mySeatIndex && state.phase === 'lead';
+      const isMyDefend = state.defenderIndex === state.mySeatIndex && state.phase === 'defend';
+      if (!isMyLead && !isMyDefend) return;
+
+      const idx = state.selectedCardIds.indexOf(cardId);
+      if (idx > -1) {
+        state.selectedCardIds.splice(idx, 1);
+      } else {
+        if (isMyLead) {
+          if (state.selectedCardIds.length > 0) {
+            const firstCard = me.hand.find(c => c.id === state.selectedCardIds[0]);
+            const targetCard = me.hand.find(c => c.id === cardId);
+            if (firstCard && targetCard && firstCard.suit !== targetCard.suit) {
+              state.selectedCardIds = [cardId];
+              setBanner("Bir xil rangdagi (mast) kartalarni tanlang!", "info");
+            } else {
+              state.selectedCardIds.push(cardId);
+            }
+          } else {
+            state.selectedCardIds.push(cardId);
+          }
+        } else if (isMyDefend) {
+          const needed = state.tableLead.length;
+          if (state.selectedCardIds.length >= needed) {
+            state.selectedCardIds.shift();
+          }
+          state.selectedCardIds.push(cardId);
+        }
+      }
+
+      sound.tap();
+      haptic('impact');
+      updateUI();
+    }
+
+    function setupCardGestures(cardEl) {
+      const cardId = cardEl.getAttribute('data-card-id');
+      let startX = 0, startY = 0, currentX = 0, currentY = 0;
+      let isDragging = false;
+      let activePointerId = null;
+
+      function onPointerDown(e) {
+        if (state.isGameOver || state.botBusy) return;
+        activePointerId = e.pointerId;
+        try { cardEl.setPointerCapture(activePointerId); } catch (err) {}
+        startX = e.clientX;
+        startY = e.clientY;
+        currentX = e.clientX;
+        currentY = e.clientY;
+        isDragging = false;
+        cardEl.style.transition = 'none';
+        cardEl.style.zIndex = '60';
+      }
+
+      function onPointerMove(e) {
+        if (activePointerId === null || e.pointerId !== activePointerId) return;
+        currentX = e.clientX;
+        currentY = e.clientY;
+        const dx = currentX - startX;
+        const dy = currentY - startY;
+
+        if (!isDragging && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+          isDragging = true;
+        }
+
+        if (isDragging) {
+          cardEl.style.transform = `translate(${dx}px, ${dy}px) rotate(${dx * 0.08}deg) scale(1.06)`;
+          if (dy < -45) {
+            el.mainTable.classList.add('table-drop-hover');
+            el.playerFooter.classList.remove('discard-drop-hover');
+          } else if (dy > 40 && state.defenderIndex === state.mySeatIndex && state.phase === 'defend') {
+            el.playerFooter.classList.add('discard-drop-hover');
+            el.mainTable.classList.remove('table-drop-hover');
+          } else {
+            el.mainTable.classList.remove('table-drop-hover');
+            el.playerFooter.classList.remove('discard-drop-hover');
+          }
+        }
+      }
+
+      function onPointerUp(e) {
+        if (activePointerId === null || e.pointerId !== activePointerId) return;
+        try { cardEl.releasePointerCapture(activePointerId); } catch (err) {}
+        activePointerId = null;
+
+        const dy = currentY - startY;
+        cardEl.style.transition = 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+        cardEl.style.zIndex = '';
+        cardEl.style.transform = '';
+
+        el.mainTable.classList.remove('table-drop-hover');
+        el.playerFooter.classList.remove('discard-drop-hover');
+
+        if (!isDragging) {
+          toggleCardSelection(cardId);
+          return;
+        }
+
+        const me = state.players[state.mySeatIndex];
+        const tableRect = el.mainTable.getBoundingClientRect();
+        const droppedOnTable = (currentY >= tableRect.top && currentY <= tableRect.bottom) || dy < -50;
+        const swipedDown = dy > 45;
+
+        if (droppedOnTable) {
+          if (state.attackerIndex === state.mySeatIndex && state.phase === 'lead') {
+            if (!state.selectedCardIds.includes(cardId)) {
+              if (state.selectedCardIds.length > 0) {
+                const first = me.hand.find(c => c.id === state.selectedCardIds[0]);
+                const curr = me.hand.find(c => c.id === cardId);
+                if (first && curr && first.suit === curr.suit) {
+                  state.selectedCardIds.push(cardId);
+                } else {
+                  state.selectedCardIds = [cardId];
+                }
+              } else {
+                state.selectedCardIds = [cardId];
+              }
+            }
+            executeLeadMove(state.mySeatIndex, state.selectedCardIds);
+          } else if (state.defenderIndex === state.mySeatIndex && state.phase === 'defend') {
+            const needed = state.tableLead.length;
+            if (!state.selectedCardIds.includes(cardId)) {
+              if (state.selectedCardIds.length >= needed) state.selectedCardIds.shift();
+              state.selectedCardIds.push(cardId);
+            }
+            const selected = me.hand.filter(c => state.selectedCardIds.includes(c.id));
+            if (selected.length === needed) {
+              if (canBeatAll(state.tableLead, selected, state.trumpSuit)) {
+                executeDefendMove(state.mySeatIndex, state.selectedCardIds, true);
+              } else {
+                setBanner("Bu karta bilan urib bo'lmaydi! Pastga surib tashlang.", "warn");
+                haptic('error');
+                updateUI();
+              }
+            } else {
+              setBanner(`Urish uchun yana ${needed - selected.length} ta karta tanlang!`, "info");
+              updateUI();
+            }
+          }
+        } else if (swipedDown && state.defenderIndex === state.mySeatIndex && state.phase === 'defend') {
+          const needed = state.tableLead.length;
+          if (!state.selectedCardIds.includes(cardId)) {
+            if (state.selectedCardIds.length >= needed) state.selectedCardIds.shift();
+            state.selectedCardIds.push(cardId);
+          }
+          if (state.selectedCardIds.length === needed) {
+            executeDefendMove(state.mySeatIndex, state.selectedCardIds, false);
+          } else {
+            setBanner(`Yopib tashlash uchun ${needed} ta karta tanlang!`, "warn");
+            updateUI();
+          }
+        } else {
+          updateUI();
+        }
+      }
+
+      cardEl.addEventListener('pointerdown', onPointerDown);
+      cardEl.addEventListener('pointermove', onPointerMove);
+      cardEl.addEventListener('pointerup', onPointerUp);
+      cardEl.addEventListener('pointercancel', onPointerUp);
+    }
+
+    // --- 4 tadan kartani to'ldirish (Aylana tartibida hujumchidan boshlab) ---
+    function refillAllHands(winnerIndex) {
+      for (let offset = 0; offset < state.playerCount; offset++) {
+        const pIdx = (winnerIndex + offset) % state.playerCount;
+        const player = state.players[pIdx];
+        while (player.hand.length < HAND_SIZE && state.deck.length > 0) {
+          player.hand.push(state.deck.pop());
+        }
+      }
+    }
+
+    // --- Hujum va Himoya harakatlarini bajarish ---
+    function executeLeadMove(seatIdx, cardIds) {
+      const player = state.players[seatIdx];
+      const leadCards = player.hand.filter(c => cardIds.includes(c.id));
+      if (leadCards.length === 0) return;
+
+      player.hand = player.hand.filter(c => !cardIds.includes(c.id));
+      state.tableLead = leadCards;
+      state.tableDefend = [];
+      state.selectedCardIds = [];
+      state.phase = 'defend';
+
+      sound.playCard();
+      haptic('impact');
+      const defPlayer = state.players[state.defenderIndex];
+      setBanner(`${player.name} ${leadCards.length} ta karta tashladi ➔ ${defPlayer.name} javob beradi`);
+      updateUI();
+      syncOnlineRoomState();
+      scheduleNextBotAction();
+    }
+
+    function executeDefendMove(seatIdx, cardIds, isBeating) {
+      const defender = state.players[seatIdx];
+      const attacker = state.players[state.attackerIndex];
+      const chosen = defender.hand.filter(c => cardIds.includes(c.id));
+      if (chosen.length !== state.tableLead.length) return;
+
+      defender.hand = defender.hand.filter(c => !cardIds.includes(c.id));
+      state.tableDefend = chosen.map(c => ({ ...c, hiddenDiscard: !isBeating }));
+      state.selectedCardIds = [];
+      state.botBusy = true;
+
+      sound.playCard();
+      haptic('impact');
+      updateUI();
+
+      setTimeout(() => {
+        const allTrickCards = [...state.tableLead, ...chosen];
+        const trickPts = calculatePoints(allTrickCards);
+        let trickWinnerIdx = state.attackerIndex;
+
+        if (isBeating) {
+          sound.takeTrick();
+          defender.wonCards.push(...allTrickCards);
+          trickWinnerIdx = state.defenderIndex;
+          setBanner(`${defender.name} urib oldi! (+${trickPts} ochko)`, trickWinnerIdx === state.mySeatIndex ? "win" : "warn");
+        } else {
+          sound.tap();
+          attacker.wonCards.push(...allTrickCards);
+          trickWinnerIdx = state.attackerIndex;
+          setBanner(`${defender.name} yopib tashladi. ${attacker.name} oldi (+${trickPts} pt)`, trickWinnerIdx === state.mySeatIndex ? "win" : "info");
+        }
+
+        state.tableLead = [];
+        state.tableDefend = [];
+        state.phase = 'lead';
+        state.attackerIndex = trickWinnerIdx;
+        state.defenderIndex = (trickWinnerIdx + 1) % state.playerCount;
+        state.botBusy = false;
+
+        refillAllHands(trickWinnerIdx);
+        checkRoundEndCondition();
+        updateUI();
+        syncOnlineRoomState();
+        scheduleNextBotAction();
+      }, 700);
+    }
+
+    // --- Botlar AI mantig'i (2, 3, 4 kishilik stol uchun) ---
+    function scheduleNextBotAction() {
+      if (state.isGameOver || state.botBusy) return;
+      const activeIdx = state.phase === 'lead' ? state.attackerIndex : state.defenderIndex;
+      const activePlayer = state.players[activeIdx];
+      if (!activePlayer || !activePlayer.isBot) return;
+
+      state.botBusy = true;
+      setTimeout(() => {
+        state.botBusy = false;
+        if (state.isGameOver) return;
+        if (state.phase === 'lead') {
+          runBotLead(activeIdx);
+        } else {
+          runBotDefend(activeIdx);
+        }
+      }, 850);
+    }
+
+    function runBotLead(botIdx) {
+      const bot = state.players[botIdx];
+      if (!bot) return;
+
+      // Botda Bura yoki Moskva bormi?
+      const combos = checkCombinations(bot.hand, state.trumpSuit);
+      if (combos.bura) {
+        sound.lose();
+        finishRound(botIdx, `${bot.name} qo'lida BURA (4 ta kozir) chiqdi!`);
+        return;
+      }
+      if (combos.moskva) {
+        sound.lose();
+        finishRound(botIdx, `${bot.name} qo'lida MOSKVA kombinatsiyasi chiqdi!`);
+        return;
+      }
+      // Bot 31 ochko yoki Maqsadli Marra ochkosini yig'dimi?
+      const botPts = calculatePoints(bot.wonCards);
+      const botProjectedTotal = (bot.totalScore || 0) + botPts;
+      if (botPts >= 31 || botProjectedTotal >= state.targetScore) {
+        sound.lose();
+        finishRound(botIdx, `${bot.name} yetarli ochko yig'ganini e'lon qildi (Raundda: ${botPts} pt)!`);
+        return;
+      }
+
+      if (bot.hand.length === 0) {
+        checkRoundEndCondition();
+        return;
+      }
+
+      // Bir xil rangdagi juft/uchlik/to'rtlik kartalarni qidirish
+      const suitGroups = {};
+      bot.hand.forEach(c => {
+        suitGroups[c.suit] = suitGroups[c.suit] || [];
+        suitGroups[c.suit].push(c);
+      });
+
+      let leadCards = [];
+      for (const [s, cards] of Object.entries(suitGroups)) {
+        if (cards.length >= 2 && s !== state.trumpSuit) {
+          leadCards = cards;
+          break;
+        }
+      }
+
+      if (leadCards.length === 0) {
+        const nonTrumps = bot.hand.filter(c => c.suit !== state.trumpSuit);
+        if (nonTrumps.length > 0) {
+          nonTrumps.sort((a, b) => a.value - b.value);
+          leadCards = [nonTrumps[0]];
+        } else {
+          const sorted = [...bot.hand].sort((a, b) => a.value - b.value);
+          leadCards = [sorted[0]];
+        }
+      }
+
+      executeLeadMove(botIdx, leadCards.map(c => c.id));
+    }
+
+    function runBotDefend(botIdx) {
+      const bot = state.players[botIdx];
+      if (!bot) return;
+
+      const needed = state.tableLead.length;
+      const hand = [...bot.hand];
+
+      function getCombos(arr, k) {
+        if (k === 0) return [[]];
+        if (arr.length < k) return [];
+        const [first, ...rest] = arr;
+        return [
+          ...getCombos(rest, k - 1).map(c => [first, ...c]),
+          ...getCombos(rest, k)
+        ];
+      }
+
+      const candidates = getCombos(hand, needed);
+      const validBeats = candidates.filter(combo => canBeatAll(state.tableLead, combo, state.trumpSuit));
+
+      if (validBeats.length > 0) {
+        validBeats.sort((a, b) => {
+          const trumpsA = a.filter(c => c.suit === state.trumpSuit).length;
+          const trumpsB = b.filter(c => c.suit === state.trumpSuit).length;
+          if (trumpsA !== trumpsB) return trumpsA - trumpsB;
+          return calculatePoints(a) - calculatePoints(b);
+        });
+        executeDefendMove(botIdx, validBeats[0].map(c => c.id), true);
+      } else {
+        hand.sort((a, b) => {
+          if (a.suit === state.trumpSuit && b.suit !== state.trumpSuit) return 1;
+          if (b.suit === state.trumpSuit && a.suit !== state.trumpSuit) return -1;
+          return a.points - b.points || a.value - b.value;
+        });
+        const discard = hand.slice(0, needed);
+        executeDefendMove(botIdx, discard.map(c => c.id), false);
+      }
+    }
+
+    function checkRoundEndCondition() {
+      if (state.isGameOver) return;
+      const allHandsEmpty = state.players.every(p => p.hand.length === 0);
+      if (state.deck.length === 0 && allHandsEmpty) {
+        let bestIdx = 0;
+        let maxPts = -1;
+        state.players.forEach((p, idx) => {
+          const pts = calculatePoints(p.wonCards);
+          if (pts > maxPts) {
+            maxPts = pts;
+            bestIdx = idx;
+          }
+        });
+        const winner = state.players[bestIdx];
+        finishRound(bestIdx, `Koloda tugadi! Eng ko'p ochkoni ${winner.name} to'pladi (${maxPts} pt).`);
+      }
+    }
+
+    function finishRound(winnerIndex, reasonText, bonusPoints = 0) {
+      state.isGameOver = true;
+      const winner = state.players[winnerIndex];
+      if (winner) winner.wins++;
+
+      // Har bir o'yinchining shu raundda yig'gan ochkolarini umumiy hisobiga qo'shish
+      state.players.forEach((p, idx) => {
+        const roundPts = calculatePoints(p.wonCards);
+        p.lastRoundPts = roundPts;
+        p.totalScore = (p.totalScore || 0) + roundPts;
+      });
+
+      // Agar Bura yoki Moskva bo'lsa, g'olibga qo'shimcha bonus yoki kamida 31 ochko kafolatlanadi
+      if (winner && bonusPoints > 0 && winner.lastRoundPts < bonusPoints) {
+        const diff = bonusPoints - winner.lastRoundPts;
+        winner.totalScore += diff;
+        winner.lastRoundPts += diff;
+      }
+
+      // Kimdir belgilangan marra (31, 61, 101, 120...) ochkosiga yetdimi?
+      let matchWinnerIdx = -1;
+      if (state.targetScore <= 31) {
+        state.isMatchOver = true;
+        matchWinnerIdx = winnerIndex;
+      } else {
+        let highestTotal = -1;
+        state.players.forEach((p, idx) => {
+          if (p.totalScore >= state.targetScore && p.totalScore > highestTotal) {
+            highestTotal = p.totalScore;
+            matchWinnerIdx = idx;
+          }
+        });
+        if (matchWinnerIdx !== -1) {
+          state.isMatchOver = true;
+        } else {
+          state.isMatchOver = false;
+        }
+      }
+
+      const displayWinnerIdx = state.isMatchOver ? matchWinnerIdx : winnerIndex;
+      const displayWinner = state.players[displayWinnerIdx];
+
+      if (displayWinnerIdx === state.mySeatIndex) {
+        sound.win();
+        haptic('success');
+        el.resultIcon.innerText = state.isMatchOver ? '🏆' : '👑';
+        el.resultTitle.innerText = state.isMatchOver
+          ? `MATCH G'OLIBI (${state.targetScore} PT)!`
+          : `${state.roundNumber}-RAUNDDA G'ALABA!`;
+        el.resultTitle.className = "text-xl font-black text-amber-300 font-cinzel mb-1";
+      } else {
+        sound.lose();
+        haptic('error');
+        el.resultIcon.innerText = state.isMatchOver ? '💔' : '🎯';
+        el.resultTitle.innerText = state.isMatchOver
+          ? `${displayWinner ? displayWinner.name : 'Raqib'} Matchni Yutdi!`
+          : `${state.roundNumber}-Raund: ${displayWinner ? displayWinner.name : 'Raqib'}`;
+        el.resultTitle.className = "text-xl font-black text-rose-400 font-cinzel mb-1";
+      }
+
+      el.resultDesc.innerText = state.isMatchOver
+        ? `${reasonText}\n🏆 Yakuniy marra (${state.targetScore} ochko) zabt etildi!`
+        : `${reasonText}\n🎯 O'yin ${state.targetScore} ochkogacha davom etadi. Navbatdagi raundga tayyormisiz?`;
+
+      el.resultScoresList.innerHTML = state.players.map((p, idx) => {
+        const isWin = idx === displayWinnerIdx;
+        const progressPct = Math.min(100, Math.round(((p.totalScore || 0) / state.targetScore) * 100));
+        return `
+          <div class="flex flex-col py-1.5 px-2.5 rounded-xl ${isWin ? 'bg-amber-500/20 border border-amber-400/40' : 'bg-white/5'}">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold">${p.avatar} ${p.name}</span>
+              <span class="font-bold ${isWin ? 'text-amber-300' : 'text-slate-200'}">
+                +${p.lastRoundPts || 0} pt ➔ Jami: ${p.totalScore || 0} / ${state.targetScore}
+              </span>
+            </div>
+            <div class="w-full bg-black/50 h-1.5 rounded-full overflow-hidden mt-1">
+              <div class="bg-gradient-to-r from-amber-500 to-emerald-400 h-full transition-all duration-500" style="width: ${progressPct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      el.nextRoundBtn.innerText = state.isMatchOver ? "Yangi Match Boshlash 🔄" : "Keyingi Raund ➔";
+
+      el.resultModal.classList.remove('hidden');
+      updateUI();
+      syncOnlineRoomState();
+    }
+
+    // --- Yangi O'yinni Boshlash (4 tadan karta va 2/3/4 kishilik) ---
+    function startNewRound(resetMatch = false) {
+      if (resetMatch || state.isMatchOver) {
+        state.roundNumber = 1;
+        state.isMatchOver = false;
+        state.players.forEach(p => {
+          p.totalScore = 0;
+          p.lastRoundPts = 0;
+        });
+      } else {
+        state.roundNumber++;
+      }
+
+      state.deck = createDeck();
+      state.tableLead = [];
+      state.tableDefend = [];
+      state.selectedCardIds = [];
+      state.isGameOver = false;
+      state.botBusy = false;
+      state.phase = 'lead';
+
+      const botNames = ["Bot Sardor", "Bot Jasur", "Bot Timur"];
+      const botAvatars = ["🤖", "🦊", "🦁"];
+
+      if (state.players.length !== state.playerCount) {
+        state.players = [];
+        for (let i = 0; i < state.playerCount; i++) {
+          if (i === 0) {
+            state.players.push({
+              id: 'player_0',
+              name: myTelegramName,
+              avatar: '👤',
+              hand: [],
+              wonCards: [],
+              totalScore: 0,
+              lastRoundPts: 0,
+              wins: 0,
+              isBot: false
+            });
+          } else {
+            state.players.push({
+              id: `bot_${i}`,
+              name: botNames[i - 1],
+              avatar: botAvatars[i - 1],
+              hand: [],
+              wonCards: [],
+              totalScore: 0,
+              lastRoundPts: 0,
+              wins: 0,
+              isBot: true
+            });
+          }
+        }
+      } else {
+        state.players.forEach(p => {
+          p.hand = [];
+          p.wonCards = [];
+        });
+      }
+
+      // Kozirni belgilash (koloda ostidagi karta)
+      state.trumpCard = state.deck[0];
+      state.trumpSuit = state.trumpCard.suit;
+
+      // Har bir o'yinchiga 4 tadan karta tarqatish
+      for (let c = 0; c < HAND_SIZE; c++) {
+        for (let p = 0; p < state.playerCount; p++) {
+          if (state.deck.length > 0) {
+            state.players[p].hand.push(state.deck.pop());
+          }
+        }
+      }
+
+      state.attackerIndex = 0;
+      state.defenderIndex = 1 % state.playerCount;
+
+      el.resultModal.classList.add('hidden');
+      el.lobbyModal.classList.add('hidden');
+
+      const suitName = SUITS.find(s => s.id === state.trumpSuit).name;
+      setBanner(`Raund #${state.roundNumber} (Marra: ${state.targetScore} pt) • Kozir: ${suitName}`);
+      sound.tap();
+      updateUI();
+      syncOnlineRoomState();
+      scheduleNextBotAction();
+    }
+
+    // --- Telegram Do'stlar bilan Onlayn Xona Yaratish & Ulashish ---
+    async function createMultiplayerRoom() {
+      const code = Math.floor(1000 + Math.random() * 9000).toString();
+      state.roomCode = code;
+      state.isOnlineRoom = true;
+      el.activeRoomCodeBadge.innerText = code;
+      el.onlineRoomIndicator.classList.remove('hidden');
+      el.onlineRoomIndicator.classList.add('flex');
+      el.roomStatusText.innerText = `Onlayn Xona #${code} • ${state.playerCount} kishilik`;
+
+      startNewRound();
+
+      if (db && currentUser) {
+        try {
+          const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'bura_rooms', `room_${code}`);
+          await setDoc(roomRef, {
+            roomCode: code,
+            playerCount: state.playerCount,
+            hostName: myTelegramName,
+            createdAt: Date.now(),
+            gameStateJson: JSON.stringify({
+              trumpCard: state.trumpCard,
+              trumpSuit: state.trumpSuit,
+              attackerIndex: state.attackerIndex,
+              defenderIndex: state.defenderIndex,
+              phase: state.phase
+            })
+          });
+          listenToRoomChanges(code);
+        } catch (err) {}
+      }
+
+      setBanner(`Xona #${code} ochildi! "+ Taklif" orqali do'stlarga ulashing`, "win");
+    }
+
+    async function joinMultiplayerRoom(inputCode) {
+      const cleanCode = (inputCode || '').trim();
+      if (cleanCode.length < 4) {
+        el.lobbyFeedbackMsg.innerText = "Iltimos, 4 xonali xona kodini kiriting!";
+        el.lobbyFeedbackMsg.classList.remove('hidden');
+        return;
+      }
+
+      state.roomCode = cleanCode;
+      state.isOnlineRoom = true;
+      el.activeRoomCodeBadge.innerText = cleanCode;
+      el.onlineRoomIndicator.classList.remove('hidden');
+      el.onlineRoomIndicator.classList.add('flex');
+      el.roomStatusText.innerText = `Onlayn Xona #${cleanCode} • ${state.playerCount} kishilik`;
+
+      startNewRound();
+      setBanner(`Xona #${cleanCode} ga ulandingiz!`, "win");
+      listenToRoomChanges(cleanCode);
+    }
+
+    function listenToRoomChanges(code) {
+      if (!db || !currentUser) return;
+      if (roomUnsubscribe) roomUnsubscribe();
+      try {
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'bura_rooms', `room_${code}`);
+        roomUnsubscribe = onSnapshot(roomRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.playerCount && data.playerCount !== state.playerCount) {
+              state.playerCount = data.playerCount;
+            }
+          }
+        }, (err) => {});
+      } catch (e) {}
+    }
+
+    async function syncOnlineRoomState() {
+      if (!state.isOnlineRoom || !state.roomCode || !db || !currentUser) return;
+      try {
+        const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'bura_rooms', `room_${state.roomCode}`);
+        await setDoc(roomRef, {
+          roomCode: state.roomCode,
+          playerCount: state.playerCount,
+          targetScore: state.targetScore,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (e) {}
+    }
+
+    function shareRoomToTelegram() {
+      const code = state.roomCode || Math.floor(1000 + Math.random() * 9000).toString();
+      if (!state.roomCode) {
+        createMultiplayerRoom();
+      }
+      const shareText = `🃏 Bura (31) — 4 Kartalik o'yinga qo'shiling!\n🔥 Stol: ${state.playerCount} kishilik | Marra: ${state.targetScore} ochkogacha\n🔑 Xona kodi: ${code}\nKeling, kuch sinashamiz!`;
+      const shareUrl = window.location.href.split('?')[0] + `?room=${code}&count=${state.playerCount}&target=${state.targetScore}`;
+      const tgShareLink = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeIComponent(shareText)}`;
+
+      if (tg && tg.openTelegramLink) {
+        tg.openTelegramLink(tgShareLink);
+      } else {
+        window.open(tgShareLink, '_blank');
+      }
+    }
+
+    // --- Tugmalar Hodisalari ---
+    function highlightTargetButtons(selectedVal) {
+      el.targetScoreBtns.forEach(b => {
+        const val = parseInt(b.getAttribute('data-target'), 10);
+        if (val === selectedVal) {
+          b.className = "target-score-btn py-2 px-1 rounded-xl border-2 border-amber-400 bg-amber-500/20 text-white font-bold text-xs flex flex-col items-center transition";
+        } else {
+          b.className = "target-score-btn py-2 px-1 rounded-xl border border-white/15 bg-white/5 text-slate-300 font-bold text-xs flex flex-col items-center transition";
+        }
+      });
+    }
+
+    el.targetScoreBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = parseInt(btn.getAttribute('data-target'), 10);
+        state.targetScore = target;
+        el.customTargetInput.value = '';
+        highlightTargetButtons(target);
+        sound.tap();
+      });
+    });
+
+    el.applyCustomTargetBtn.addEventListener('click', () => {
+      const customVal = parseInt(el.customTargetInput.value, 10);
+      if (!isNaN(customVal) && customVal >= 11 && customVal <= 1000) {
+        state.targetScore = customVal;
+        highlightTargetButtons(-1);
+        el.lobbyFeedbackMsg.innerText = `Marra ${customVal} ochko etib belgilandi!`;
+        el.lobbyFeedbackMsg.classList.remove('hidden');
+        sound.tap();
+      } else {
+        el.lobbyFeedbackMsg.innerText = "11 dan 1000 gacha son kiriting!";
+        el.lobbyFeedbackMsg.classList.remove('hidden');
+      }
+    });
+
+    el.playerCountBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const count = parseInt(btn.getAttribute('data-count'), 10);
+        state.playerCount = count;
+        el.playerCountBtns.forEach(b => {
+          b.className = "player-count-btn py-2.5 px-2 rounded-2xl border border-white/15 bg-white/5 text-slate-300 font-bold text-xs flex flex-col items-center transition";
+        });
+        btn.className = "player-count-btn py-2.5 px-2 rounded-2xl border-2 border-amber-400 bg-amber-500/20 text-white font-bold text-xs flex flex-col items-center transition";
+        sound.tap();
+      });
+    });
+
+    el.startBotGameBtn.addEventListener('click', () => {
+      state.isOnlineRoom = false;
+      state.roomCode = null;
+      el.onlineRoomIndicator.classList.add('hidden');
+      el.roomStatusText.innerText = `${state.playerCount} o'yinchi • ${state.targetScore} pt gacha`;
+      state.players = [];
+      startNewRound(true);
+    });
+
+    el.createRoomBtn.addEventListener('click', () => {
+      state.players = [];
+      createMultiplayerRoom();
+    });
+
+    el.shareTelegramBtn.addEventListener('click', shareRoomToTelegram);
+    el.inviteTgBtn.addEventListener('click', shareRoomToTelegram);
+
+    el.joinRoomBtn.addEventListener('click', () => {
+      joinMultiplayerRoom(el.joinRoomInput.value);
+    });
+
+    el.openLobbyBtn.addEventListener('click', () => {
+      el.lobbyModal.classList.remove('hidden');
+    });
+
+    el.closeLobbyBtn.addEventListener('click', () => {
+      el.lobbyModal.classList.add('hidden');
+    });
+
+    el.changeModeAfterBtn.addEventListener('click', () => {
+      el.resultModal.classList.add('hidden');
+      el.lobbyModal.classList.remove('hidden');
+    });
+
+    el.primaryActionBtn.addEventListener('click', () => {
+      if (state.attackerIndex === state.mySeatIndex && state.phase === 'lead') {
+        executeLeadMove(state.mySeatIndex, state.selectedCardIds);
+      } else if (state.defenderIndex === state.mySeatIndex && state.phase === 'defend') {
+        executeDefendMove(state.mySeatIndex, state.selectedCardIds, true);
+      }
+    });
+
+    el.secondaryActionBtn.addEventListener('click', () => {
+      if (state.defenderIndex === state.mySeatIndex && state.phase === 'defend') {
+        executeDefendMove(state.mySeatIndex, state.selectedCardIds, false);
+      }
+    });
+
+    el.claim31Btn.addEventListener('click', () => {
+      if (state.isGameOver) return;
+      const me = state.players[state.mySeatIndex];
+      const pts = calculatePoints(me.wonCards);
+      const projectedTotal = (me.totalScore || 0) + pts;
+      if (pts >= 31 || projectedTotal >= state.targetScore) {
+        finishRound(state.mySeatIndex, `Barakalla! Siz raundda ${pts} ochko (Jami: ${projectedTotal} pt) bilan g'olib bo'ldingiz!`);
+      } else {
+        const nextWinner = (state.mySeatIndex + 1) % state.playerCount;
+        finishRound(nextWinner, `Xato e'lon! Sizda raundda ${pts} pt (Jami: ${projectedTotal}/${state.targetScore}) bor edi.`);
+      }
+    });
+
+    el.claimBuraBtn.addEventListener('click', () => {
+      const me = state.players[state.mySeatIndex];
+      if (checkCombinations(me.hand, state.trumpSuit).bura) {
+        finishRound(state.mySeatIndex, "BURA! Qo'lingizda 4 ta kozir bilan so'zsiz g'alaba (+31 pt)!", 31);
+      }
+    });
+
+    el.claimMoskvaBtn.addEventListener('click', () => {
+      const me = state.players[state.mySeatIndex];
+      if (checkCombinations(me.hand, state.trumpSuit).moskva) {
+        finishRound(state.mySeatIndex, "MOSKVA! Tuzlar kombinatsiyasi bilan mutlaq g'alaba (+31 pt)!", 31);
+      }
+    });
+
+    el.nextRoundBtn.addEventListener('click', () => startNewRound(false));
+
+    el.soundBtn.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      el.soundEmoji.innerText = sound.enabled ? '🔊' : '🔇';
+    });
+
+    el.rulesBtn.addEventListener('click', () => el.rulesModal.classList.remove('hidden'));
+    el.closeRulesBtn.addEventListener('click', () => el.rulesModal.classList.add('hidden'));
+    el.closeRulesBottomBtn.addEventListener('click', () => el.rulesModal.classList.add('hidden'));
+
+    // Havola parametrlarida xona kodi bo'lsa avtomatik ulash
+    const urlParams = new URLSearchParams(window.location.search);
+    const invitedRoom = urlParams.get('room');
+    const invitedCount = parseInt(urlParams.get('count'), 10);
+    const invitedTarget = parseInt(urlParams.get('target'), 10);
+    if ([2, 3, 4].includes(invitedCount)) {
+      state.playerCount = invitedCount;
+    }
+    if (!isNaN(invitedTarget) && invitedTarget >= 11) {
+      state.targetScore = invitedTarget;
+      highlightTargetButtons(invitedTarget);
+    }
+
+    startNewRound(true);
+    if (invitedRoom) {
+      joinMultiplayerRoom(invitedRoom);
+    }
+  </script>
+</body>
+</html>
